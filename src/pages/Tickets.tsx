@@ -80,10 +80,10 @@ export default function Tickets() {
         .order("created_at", { ascending: false });
 
       if (statusFilter !== "all") {
-        query = query.eq("status", statusFilter);
+        query = query.eq("status", statusFilter as TicketStatus);
       }
       if (priorityFilter !== "all") {
-        query = query.eq("priority", priorityFilter);
+        query = query.eq("priority", priorityFilter as TicketPriority);
       }
 
       const { data, error } = await query;
