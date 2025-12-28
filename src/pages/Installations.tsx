@@ -165,7 +165,7 @@ export default function Installations() {
                   <div className="flex gap-1 justify-end">
                     <Select
                       value={ticket.status}
-                      onValueChange={(status) => updateStatus.mutate({ id: ticket.id, status })}
+                      onValueChange={(status) => updateStatus.mutate({ id: ticket.id, status: status as typeof ticket.status })}
                     >
                       <SelectTrigger className="w-[130px] h-8">
                         <SelectValue />

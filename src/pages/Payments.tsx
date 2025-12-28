@@ -98,7 +98,7 @@ export default function Payments() {
         .order("created_at", { ascending: false });
 
       if (statusFilter !== "all") {
-        query = query.eq("status", statusFilter);
+        query = query.eq("status", statusFilter as PaymentStatus);
       }
 
       const { data, error } = await query;
@@ -147,18 +147,20 @@ export default function Payments() {
       });
       if (error) throw error;
 
+      // Update coupon uses_count if a coupon was used
       if (paymentData.coupon_id) {
-        await supabase.rpc("increment", { 
-          row_id: paymentData.coupon_id, 
-          table_name: "coupons", 
-          column_name: "uses_count" 
-        }).catch(() => {
-          // If RPC doesn't exist, update directly
-          return supabase
+        const { data: coupon } = await supabase
+          .from("coupons")
+          .select("uses_count")
+          .eq("id", paymentData.coupon_id)
+          .single();
+        
+        if (coupon) {
+          await supabase
             .from("coupons")
-            .update({ uses_count: supabase.rpc("uses_count") })
+            .update({ uses_count: coupon.uses_count + 1 })
             .eq("id", paymentData.coupon_id);
-        });
+        }
       }
     },
     onSuccess: () => {

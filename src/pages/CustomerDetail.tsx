@@ -163,7 +163,7 @@ export default function CustomerDetail() {
             </span>
           </div>
         </div>
-        <Select value={customer.status} onValueChange={(v) => updateStatus.mutate(v)}>
+        <Select value={customer.status} onValueChange={(v) => updateStatus.mutate(v as typeof customer.status)}>
           <SelectTrigger className="w-[140px]">
             <Badge variant="outline" className={statusColors[customer.status]}>
               {customer.status}
