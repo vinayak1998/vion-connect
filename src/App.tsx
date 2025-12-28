@@ -18,6 +18,7 @@ import InstallationDetail from "./pages/InstallationDetail";
 import Customers from "./pages/Customers";
 import CustomerDetail from "./pages/CustomerDetail";
 import Tickets from "./pages/Tickets";
+import TicketDetail from "./pages/TicketDetail";
 import Plans from "./pages/Plans";
 import Payments from "./pages/Payments";
 import Coupons from "./pages/Coupons";
