@@ -410,6 +410,7 @@ export type Database = {
           notes: string | null
           phone: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -418,6 +419,7 @@ export type Database = {
           notes?: string | null
           phone: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -426,6 +428,7 @@ export type Database = {
           notes?: string | null
           phone?: string
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -711,6 +714,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_partner_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -720,7 +724,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin"
+      app_role: "admin" | "partner"
       booking_status: "Paid" | "Pending" | "Failed"
       coupon_type: "percentage" | "flat"
       customer_status: "Active" | "Suspended" | "Churned"
@@ -863,7 +867,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin"],
+      app_role: ["admin", "partner"],
       booking_status: ["Paid", "Pending", "Failed"],
       coupon_type: ["percentage", "flat"],
       customer_status: ["Active", "Suspended", "Churned"],

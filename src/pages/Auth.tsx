@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -13,17 +13,18 @@ export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { signIn, signUp, user } = useAuth();
+  const { signIn, signUp, user, userRole } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const from = location.state?.from?.pathname || "/dashboard";
-
-  // Redirect if already logged in
-  if (user) {
-    navigate(from, { replace: true });
-    return null;
-  }
+  // Redirect if already logged in based on role
+  useEffect(() => {
+    if (user && userRole) {
+      const defaultPath = userRole === "partner" ? "/partner/dashboard" : "/dashboard";
+      const from = location.state?.from?.pathname || defaultPath;
+      navigate(from, { replace: true });
+    }
+  }, [user, userRole, navigate, location.state]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,7 +36,7 @@ export default function Auth() {
       toast.error(error.message);
     } else {
       toast.success("Welcome back!");
-      navigate(from, { replace: true });
+      // Navigation will happen via useEffect when userRole is loaded
     }
   };
 
@@ -49,9 +50,18 @@ export default function Auth() {
       toast.error(error.message);
     } else {
       toast.success("Account created successfully!");
-      navigate(from, { replace: true });
+      // Navigation will happen via useEffect when userRole is loaded
     }
   };
+
+  // Don't render form if already logged in
+  if (user && userRole) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex">
