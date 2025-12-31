@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "sonner";
 import { CheckCircle2, XCircle, Loader2, Wifi, MapPin, Phone, User, Home } from "lucide-react";
 import { z } from "zod";
+import LandingChatbot from "@/components/LandingChatbot";
 
 const leadSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").max(100),
@@ -358,6 +359,9 @@ export default function Landing() {
           <p className="text-sm">© 2024 Vion Internet Services. All rights reserved.</p>
         </div>
       </footer>
+
+      {/* AI Chatbot */}
+      <LandingChatbot />
     </div>
   );
 }
