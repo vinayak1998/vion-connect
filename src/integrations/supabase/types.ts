@@ -263,6 +263,42 @@ export type Database = {
           },
         ]
       }
+      email_logs: {
+        Row: {
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          error_message: string | null
+          id: string
+          status: string
+          subject: string
+          template: string
+          to_email: string
+        }
+        Insert: {
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          error_message?: string | null
+          id?: string
+          status?: string
+          subject: string
+          template: string
+          to_email: string
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          error_message?: string | null
+          id?: string
+          status?: string
+          subject?: string
+          template?: string
+          to_email?: string
+        }
+        Relationships: []
+      }
       install_tickets: {
         Row: {
           created_at: string
@@ -320,6 +356,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      invoice_settings: {
+        Row: {
+          address: string | null
+          bank_account: string | null
+          bank_ifsc: string | null
+          bank_name: string | null
+          company_name: string
+          created_at: string
+          email: string | null
+          gstin: string | null
+          id: string
+          logo_url: string | null
+          pan: string | null
+          phone: string | null
+          terms: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          bank_account?: string | null
+          bank_ifsc?: string | null
+          bank_name?: string | null
+          company_name?: string
+          created_at?: string
+          email?: string | null
+          gstin?: string | null
+          id?: string
+          logo_url?: string | null
+          pan?: string | null
+          phone?: string | null
+          terms?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          bank_account?: string | null
+          bank_ifsc?: string | null
+          bank_name?: string | null
+          company_name?: string
+          created_at?: string
+          email?: string | null
+          gstin?: string | null
+          id?: string
+          logo_url?: string | null
+          pan?: string | null
+          phone?: string | null
+          terms?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       leads: {
         Row: {
@@ -440,10 +527,16 @@ export type Database = {
           customer_id: string
           date: string
           id: string
+          invoice_number: string | null
+          invoice_url: string | null
+          link_expires_at: string | null
+          link_url: string | null
           method: Database["public"]["Enums"]["payment_method"]
           notes: string | null
           original_amount: number | null
           plan_id: string | null
+          razorpay_link_id: string | null
+          razorpay_payment_id: string | null
           status: Database["public"]["Enums"]["payment_status"]
         }
         Insert: {
@@ -453,10 +546,16 @@ export type Database = {
           customer_id: string
           date?: string
           id?: string
+          invoice_number?: string | null
+          invoice_url?: string | null
+          link_expires_at?: string | null
+          link_url?: string | null
           method?: Database["public"]["Enums"]["payment_method"]
           notes?: string | null
           original_amount?: number | null
           plan_id?: string | null
+          razorpay_link_id?: string | null
+          razorpay_payment_id?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
         }
         Update: {
@@ -466,10 +565,16 @@ export type Database = {
           customer_id?: string
           date?: string
           id?: string
+          invoice_number?: string | null
+          invoice_url?: string | null
+          link_expires_at?: string | null
+          link_url?: string | null
           method?: Database["public"]["Enums"]["payment_method"]
           notes?: string | null
           original_amount?: number | null
           plan_id?: string | null
+          razorpay_link_id?: string | null
+          razorpay_payment_id?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
         }
         Relationships: [
