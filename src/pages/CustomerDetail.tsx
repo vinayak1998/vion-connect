@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,6 +14,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -24,6 +35,9 @@ import {
   CreditCard,
   UserCircle,
   Plus,
+  Send,
+  Mail,
+  Loader2,
 } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -35,9 +49,23 @@ const statusColors: Record<string, string> = {
   Churned: "bg-destructive/20 text-destructive border-destructive/30",
 };
 
+interface CollectPaymentForm {
+  plan_id: string;
+  amount: number;
+  send_email: boolean;
+}
+
+const defaultCollectPaymentForm: CollectPaymentForm = {
+  plan_id: "",
+  amount: 0,
+  send_email: true,
+};
+
 export default function CustomerDetail() {
   const { id } = useParams();
   const queryClient = useQueryClient();
+  const [isCollectPaymentOpen, setIsCollectPaymentOpen] = useState(false);
+  const [collectPaymentForm, setCollectPaymentForm] = useState<CollectPaymentForm>(defaultCollectPaymentForm);
 
   const { data: customer, isLoading } = useQuery({
     queryKey: ["customer", id],
@@ -104,6 +132,29 @@ export default function CustomerDetail() {
     enabled: !!id,
   });
 
+  const { data: emailLogs } = useQuery({
+    queryKey: ["customer-emails", id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("email_logs")
+        .select("*")
+        .eq("entity_type", "customer")
+        .eq("entity_id", id)
+        .order("created_at", { ascending: false })
+        .limit(5);
+      return data;
+    },
+    enabled: !!id,
+  });
+
+  const { data: plans } = useQuery({
+    queryKey: ["plans-active"],
+    queryFn: async () => {
+      const { data } = await supabase.from("plans").select("*").eq("active", true).order("price");
+      return data;
+    },
+  });
+
   const updateStatus = useMutation({
     mutationFn: async (status: typeof Constants.public.Enums.customer_status[number]) => {
       const { error } = await supabase
@@ -121,6 +172,65 @@ export default function CustomerDetail() {
       toast.error(error.message);
     },
   });
+
+  const collectPaymentMutation = useMutation({
+    mutationFn: async (form: CollectPaymentForm) => {
+      // First create a pending payment record
+      const { data: payment, error: paymentError } = await supabase
+        .from("payments")
+        .insert({
+          customer_id: id,
+          plan_id: form.plan_id || null,
+          amount: form.amount,
+          original_amount: form.amount,
+          status: "Pending",
+          method: "UPI",
+        })
+        .select()
+        .single();
+
+      if (paymentError) throw paymentError;
+
+      // Call edge function to create payment link
+      const { data, error } = await supabase.functions.invoke("create-payment-link", {
+        body: {
+          payment_id: payment.id,
+          amount: form.amount,
+          customer_name: customer?.name,
+          customer_phone: customer?.phone,
+          send_email: form.send_email,
+        },
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["customer-payments", id] });
+      queryClient.invalidateQueries({ queryKey: ["customer-emails", id] });
+      setIsCollectPaymentOpen(false);
+      setCollectPaymentForm(defaultCollectPaymentForm);
+      toast.success("Payment link created and sent!");
+      if (data?.short_url) {
+        navigator.clipboard.writeText(data.short_url);
+        toast.info("Payment link copied to clipboard");
+      }
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to create payment link");
+    },
+  });
+
+  const handlePlanChange = (planId: string) => {
+    const plan = plans?.find((p) => p.id === planId);
+    if (plan) {
+      setCollectPaymentForm({
+        ...collectPaymentForm,
+        plan_id: planId,
+        amount: plan.price,
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -296,6 +406,45 @@ export default function CustomerDetail() {
               )}
             </CardContent>
           </Card>
+
+          {/* Email History */}
+          <Card className="border-border/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Mail className="h-5 w-5 text-info" />
+                Email History
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {emailLogs && emailLogs.length > 0 ? (
+                <div className="space-y-3">
+                  {emailLogs.map((log) => (
+                    <div
+                      key={log.id}
+                      className="flex items-center justify-between p-3 rounded-lg bg-secondary/30"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{log.subject}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {log.template} • {log.to_email}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <Badge variant={log.status === "sent" ? "default" : "destructive"}>
+                          {log.status}
+                        </Badge>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {format(new Date(log.created_at), "MMM d, yyyy")}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-center py-4">No emails sent</p>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* Right Column */}
@@ -344,12 +493,82 @@ export default function CustomerDetail() {
               <CardTitle className="text-lg">Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Button className="w-full justify-start" variant="outline" asChild>
-                <Link to="/payments">
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  Record Payment
-                </Link>
-              </Button>
+              <Dialog open={isCollectPaymentOpen} onOpenChange={setIsCollectPaymentOpen}>
+                <DialogTrigger asChild>
+                  <Button className="w-full justify-start" variant="outline">
+                    <Send className="h-4 w-4 mr-2" />
+                    Collect Payment
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Collect Payment</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="p-3 bg-secondary/30 rounded-lg">
+                      <p className="font-medium">{customer.name}</p>
+                      <p className="text-sm text-muted-foreground">{customer.phone}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Plan</Label>
+                      <Select
+                        value={collectPaymentForm.plan_id}
+                        onValueChange={handlePlanChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a plan" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {plans?.map((plan) => (
+                            <SelectItem key={plan.id} value={plan.id}>
+                              {plan.name} - ₹{plan.price}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Amount (₹)</Label>
+                      <Input
+                        type="number"
+                        value={collectPaymentForm.amount}
+                        onChange={(e) =>
+                          setCollectPaymentForm({
+                            ...collectPaymentForm,
+                            amount: parseFloat(e.target.value) || 0,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label>Send Email Notification</Label>
+                      <Switch
+                        checked={collectPaymentForm.send_email}
+                        onCheckedChange={(checked) =>
+                          setCollectPaymentForm({ ...collectPaymentForm, send_email: checked })
+                        }
+                      />
+                    </div>
+                    <Button
+                      onClick={() => collectPaymentMutation.mutate(collectPaymentForm)}
+                      disabled={!collectPaymentForm.amount || collectPaymentMutation.isPending}
+                      className="w-full"
+                    >
+                      {collectPaymentMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="mr-2 h-4 w-4" />
+                          Send Payment Link
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
               <Button className="w-full justify-start" variant="outline" asChild>
                 <Link to="/tickets">
                   <Ticket className="h-4 w-4 mr-2" />

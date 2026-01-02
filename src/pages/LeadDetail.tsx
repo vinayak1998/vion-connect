@@ -15,11 +15,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { ArrowLeft, CalendarIcon, Save, Wrench } from "lucide-react";
+import { ArrowLeft, CalendarIcon, Save, Wrench, UserPlus, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Constants } from "@/integrations/supabase/types";
@@ -32,11 +40,27 @@ const stageColors: Record<string, string> = {
   Lost: "bg-destructive/20 text-destructive border-destructive/30",
 };
 
+interface ConvertForm {
+  plan_id: string;
+  partner_id: string;
+  installation_date: Date | undefined;
+  create_install_ticket: boolean;
+}
+
+const defaultConvertForm: ConvertForm = {
+  plan_id: "",
+  partner_id: "",
+  installation_date: new Date(),
+  create_install_ticket: true,
+};
+
 export default function LeadDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [followupDate, setFollowupDate] = useState<Date | undefined>();
+  const [isConvertOpen, setIsConvertOpen] = useState(false);
+  const [convertForm, setConvertForm] = useState<ConvertForm>(defaultConvertForm);
 
   const { data: lead, isLoading } = useQuery({
     queryKey: ["lead", id],
@@ -71,6 +95,14 @@ export default function LeadDetail() {
     queryKey: ["partners"],
     queryFn: async () => {
       const { data } = await supabase.from("partners").select("*");
+      return data;
+    },
+  });
+
+  const { data: plans } = useQuery({
+    queryKey: ["plans-active"],
+    queryFn: async () => {
+      const { data } = await supabase.from("plans").select("*").eq("active", true).order("price");
       return data;
     },
   });
@@ -111,6 +143,35 @@ export default function LeadDetail() {
     },
   });
 
+  const convertToCustomer = useMutation({
+    mutationFn: async (form: ConvertForm) => {
+      const { data, error } = await supabase.functions.invoke("lead-to-customer", {
+        body: {
+          lead_id: id,
+          plan_id: form.plan_id,
+          partner_id: form.partner_id || null,
+          installation_date: form.installation_date ? format(form.installation_date, "yyyy-MM-dd") : null,
+          create_install_ticket: form.create_install_ticket,
+        },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["lead", id] });
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      setIsConvertOpen(false);
+      toast.success("Lead converted to customer!");
+      if (data?.customer_id) {
+        navigate(`/customers/${data.customer_id}`);
+      }
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to convert lead");
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -129,6 +190,8 @@ export default function LeadDetail() {
   const handleStageChange = (stage: string) => {
     updateLead.mutate({ stage });
   };
+
+  const canConvert = lead?.stage !== "Lost" && lead?.stage !== "Installed";
 
   if (isLoading) {
     return (
@@ -179,16 +242,124 @@ export default function LeadDetail() {
               </Button>
             ))}
           </div>
-          {lead.stage === "Scheduled Installation" && (
-            <Button
-              className="mt-4"
-              onClick={() => createInstallTicket.mutate()}
-              disabled={createInstallTicket.isPending}
-            >
-              <Wrench className="h-4 w-4 mr-2" />
-              Create Installation Ticket
-            </Button>
-          )}
+          <div className="flex gap-2 mt-4">
+            {lead.stage === "Scheduled Installation" && (
+              <Button
+                onClick={() => createInstallTicket.mutate()}
+                disabled={createInstallTicket.isPending}
+              >
+                <Wrench className="h-4 w-4 mr-2" />
+                Create Installation Ticket
+              </Button>
+            )}
+            {canConvert && (
+              <Dialog open={isConvertOpen} onOpenChange={setIsConvertOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Convert to Customer
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Convert Lead to Customer</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Plan *</Label>
+                      <Select
+                        value={convertForm.plan_id}
+                        onValueChange={(v) => setConvertForm({ ...convertForm, plan_id: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a plan" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {plans?.map((plan) => (
+                            <SelectItem key={plan.id} value={plan.id}>
+                              {plan.name} - ₹{plan.price} ({plan.speed_mbps} Mbps)
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Partner (Optional)</Label>
+                      <Select
+                        value={convertForm.partner_id}
+                        onValueChange={(v) => setConvertForm({ ...convertForm, partner_id: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a partner" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {partners?.map((partner) => (
+                            <SelectItem key={partner.id} value={partner.id}>
+                              {partner.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Installation Date</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !convertForm.installation_date && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {convertForm.installation_date
+                              ? format(convertForm.installation_date, "PPP")
+                              : "Pick a date"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={convertForm.installation_date}
+                            onSelect={(date) => setConvertForm({ ...convertForm, installation_date: date })}
+                            initialFocus
+                            className="pointer-events-auto"
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label>Create Installation Ticket</Label>
+                      <Switch
+                        checked={convertForm.create_install_ticket}
+                        onCheckedChange={(checked) =>
+                          setConvertForm({ ...convertForm, create_install_ticket: checked })
+                        }
+                      />
+                    </div>
+                    <Button
+                      onClick={() => convertToCustomer.mutate(convertForm)}
+                      disabled={!convertForm.plan_id || convertToCustomer.isPending}
+                      className="w-full"
+                    >
+                      {convertToCustomer.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Converting...
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="mr-2 h-4 w-4" />
+                          Convert to Customer
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
         </CardContent>
       </Card>
 

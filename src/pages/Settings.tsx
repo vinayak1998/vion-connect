@@ -30,7 +30,8 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Pencil, Trash2, Users, MapPin, Tag } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Plus, Pencil, Trash2, Users, MapPin, Tag, FileText, Save } from "lucide-react";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -63,6 +64,33 @@ interface CategoryForm {
 
 const defaultCategory: CategoryForm = { name: "", assignment_type: "Internal" };
 
+// Invoice Settings Form
+interface InvoiceSettingsForm {
+  company_name: string;
+  address: string;
+  phone: string;
+  email: string;
+  gstin: string;
+  pan: string;
+  bank_name: string;
+  bank_account: string;
+  bank_ifsc: string;
+  terms: string;
+}
+
+const defaultInvoiceSettings: InvoiceSettingsForm = {
+  company_name: "",
+  address: "",
+  phone: "",
+  email: "",
+  gstin: "",
+  pan: "",
+  bank_name: "",
+  bank_account: "",
+  bank_ifsc: "",
+  terms: "Payment is due within 30 days.",
+};
+
 export default function Settings() {
   const queryClient = useQueryClient();
 
@@ -80,6 +108,9 @@ export default function Settings() {
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [categoryForm, setCategoryForm] = useState<CategoryForm>(defaultCategory);
+
+  // Invoice Settings state
+  const [invoiceForm, setInvoiceForm] = useState<InvoiceSettingsForm>(defaultInvoiceSettings);
 
   // Queries
   const { data: partners, isLoading: loadingPartners } = useQuery({
@@ -108,6 +139,29 @@ export default function Settings() {
     queryFn: async () => {
       const { data, error } = await supabase.from("ticket_categories").select("*").order("name");
       if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: invoiceSettings, isLoading: loadingInvoiceSettings } = useQuery({
+    queryKey: ["invoice-settings"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("invoice_settings").select("*").limit(1).single();
+      if (error && error.code !== "PGRST116") throw error;
+      if (data) {
+        setInvoiceForm({
+          company_name: data.company_name || "",
+          address: data.address || "",
+          phone: data.phone || "",
+          email: data.email || "",
+          gstin: data.gstin || "",
+          pan: data.pan || "",
+          bank_name: data.bank_name || "",
+          bank_account: data.bank_account || "",
+          bank_ifsc: data.bank_ifsc || "",
+          terms: data.terms || "Payment is due within 30 days.",
+        });
+      }
       return data;
     },
   });
@@ -253,11 +307,35 @@ export default function Settings() {
     onError: () => toast.error("Failed to delete category"),
   });
 
+  // Invoice Settings mutation
+  const saveInvoiceSettingsMutation = useMutation({
+    mutationFn: async (settings: InvoiceSettingsForm) => {
+      // Check if settings exist
+      const { data: existing } = await supabase.from("invoice_settings").select("id").limit(1).single();
+      
+      if (existing) {
+        const { error } = await supabase
+          .from("invoice_settings")
+          .update(settings)
+          .eq("id", existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("invoice_settings").insert(settings);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["invoice-settings"] });
+      toast.success("Invoice settings saved");
+    },
+    onError: () => toast.error("Failed to save invoice settings"),
+  });
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Settings</h1>
-        <p className="text-muted-foreground">Manage partners, areas, and categories</p>
+        <p className="text-muted-foreground">Manage partners, areas, categories, and invoice settings</p>
       </div>
 
       <Tabs defaultValue="partners" className="space-y-6">
@@ -273,6 +351,10 @@ export default function Settings() {
           <TabsTrigger value="categories" className="flex items-center gap-2">
             <Tag className="h-4 w-4" />
             Ticket Categories
+          </TabsTrigger>
+          <TabsTrigger value="invoice" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Invoice Settings
           </TabsTrigger>
         </TabsList>
 
@@ -686,6 +768,131 @@ export default function Settings() {
               </TableBody>
             </Table>
           </div>
+        </TabsContent>
+
+        {/* Invoice Settings Tab */}
+        <TabsContent value="invoice" className="space-y-4">
+          {loadingInvoiceSettings ? (
+            <div className="space-y-4">
+              <Skeleton className="h-[400px] w-full" />
+            </div>
+          ) : (
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Card className="border-border/50">
+                <CardHeader>
+                  <CardTitle className="text-lg">Company Information</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Company Name</Label>
+                    <Input
+                      value={invoiceForm.company_name}
+                      onChange={(e) => setInvoiceForm({ ...invoiceForm, company_name: e.target.value })}
+                      placeholder="Your Company Name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Address</Label>
+                    <Textarea
+                      value={invoiceForm.address}
+                      onChange={(e) => setInvoiceForm({ ...invoiceForm, address: e.target.value })}
+                      placeholder="Company address"
+                      rows={2}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Phone</Label>
+                      <Input
+                        value={invoiceForm.phone}
+                        onChange={(e) => setInvoiceForm({ ...invoiceForm, phone: e.target.value })}
+                        placeholder="+91 98765 43210"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Email</Label>
+                      <Input
+                        type="email"
+                        value={invoiceForm.email}
+                        onChange={(e) => setInvoiceForm({ ...invoiceForm, email: e.target.value })}
+                        placeholder="billing@company.com"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>GSTIN</Label>
+                      <Input
+                        value={invoiceForm.gstin}
+                        onChange={(e) => setInvoiceForm({ ...invoiceForm, gstin: e.target.value.toUpperCase() })}
+                        placeholder="22AAAAA0000A1Z5"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>PAN</Label>
+                      <Input
+                        value={invoiceForm.pan}
+                        onChange={(e) => setInvoiceForm({ ...invoiceForm, pan: e.target.value.toUpperCase() })}
+                        placeholder="AAAAA0000A"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/50">
+                <CardHeader>
+                  <CardTitle className="text-lg">Bank Details</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Bank Name</Label>
+                    <Input
+                      value={invoiceForm.bank_name}
+                      onChange={(e) => setInvoiceForm({ ...invoiceForm, bank_name: e.target.value })}
+                      placeholder="HDFC Bank"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Account Number</Label>
+                    <Input
+                      value={invoiceForm.bank_account}
+                      onChange={(e) => setInvoiceForm({ ...invoiceForm, bank_account: e.target.value })}
+                      placeholder="1234567890123"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>IFSC Code</Label>
+                    <Input
+                      value={invoiceForm.bank_ifsc}
+                      onChange={(e) => setInvoiceForm({ ...invoiceForm, bank_ifsc: e.target.value.toUpperCase() })}
+                      placeholder="HDFC0001234"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Terms & Conditions</Label>
+                    <Textarea
+                      value={invoiceForm.terms}
+                      onChange={(e) => setInvoiceForm({ ...invoiceForm, terms: e.target.value })}
+                      placeholder="Payment is due within 30 days."
+                      rows={3}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="lg:col-span-2">
+                <Button
+                  onClick={() => saveInvoiceSettingsMutation.mutate(invoiceForm)}
+                  disabled={!invoiceForm.company_name || saveInvoiceSettingsMutation.isPending}
+                  className="w-full sm:w-auto"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Invoice Settings
+                </Button>
+              </div>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>
