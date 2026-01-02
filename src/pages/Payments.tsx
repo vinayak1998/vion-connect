@@ -29,7 +29,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Search, CreditCard, Tag, Check, X } from "lucide-react";
+import { Plus, Search, CreditCard, Tag, Check, X, Send, Download, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
@@ -428,13 +428,14 @@ export default function Payments() {
               <TableHead>Status</TableHead>
               <TableHead>Coupon</TableHead>
               <TableHead>Date</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
+              Array.from({ length: 8 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 7 }).map((_, j) => (
+                  {Array.from({ length: 8 }).map((_, j) => (
                     <TableCell key={j}>
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
@@ -443,7 +444,7 @@ export default function Payments() {
               ))
             ) : filteredPayments?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                   No payments found
                 </TableCell>
               </TableRow>
@@ -489,6 +490,30 @@ export default function Payments() {
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {format(new Date(payment.date), "MMM d, yyyy")}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      {payment.link_url && payment.status === "Pending" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => window.open(payment.link_url, "_blank")}
+                          title="Open payment link"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {payment.invoice_url && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => window.open(payment.invoice_url, "_blank")}
+                          title="Download invoice"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))

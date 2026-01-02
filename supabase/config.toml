@@ -2,3 +2,27 @@ project_id = "idhwrjukhpoonxvxmaia"
 
 [functions.landing-chatbot]
 verify_jwt = false
+
+[functions.send-email]
+verify_jwt = false
+
+[functions.create-payment-link]
+verify_jwt = false
+
+[functions.razorpay-webhook]
+verify_jwt = false
+
+[functions.generate-invoice]
+verify_jwt = false
+
+[functions.payment-reminders]
+verify_jwt = false
+
+[functions.lead-to-customer]
+verify_jwt = false
+
+[functions.complete-installation]
+verify_jwt = false
+
+[functions.handle-ticket-update]
+verify_jwt = false
