@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { CheckCircle2, XCircle, Loader2, Wifi, MapPin, Phone, User, Home } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, Wifi, MapPin, Phone, User, Home, LogIn, LogOut, LayoutDashboard } from "lucide-react";
 import { z } from "zod";
 import LandingChatbot from "@/components/LandingChatbot";
 
@@ -24,6 +27,9 @@ const waitlistSchema = z.object({
 });
 
 export default function Landing() {
+  const navigate = useNavigate();
+  const { user, userRole, signIn, signOut, loading } = useAuth();
+  
   const [pincode, setPincode] = useState("");
   const [checkResult, setCheckResult] = useState<"available" | "unavailable" | null>(null);
   const [checkedPincode, setCheckedPincode] = useState("");
@@ -36,6 +42,44 @@ export default function Landing() {
   // Waitlist form state
   const [waitlistForm, setWaitlistForm] = useState({ phone: "", email: "" });
   const [waitlistErrors, setWaitlistErrors] = useState<Record<string, string>>({});
+
+  // Login form state
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!loginEmail || !loginPassword) {
+      toast.error("Please enter email and password");
+      return;
+    }
+    setIsLoggingIn(true);
+    const { error } = await signIn(loginEmail, loginPassword);
+    setIsLoggingIn(false);
+    if (error) {
+      toast.error(error.message || "Login failed");
+    } else {
+      setLoginOpen(false);
+      setLoginEmail("");
+      setLoginPassword("");
+      toast.success("Logged in successfully");
+    }
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    toast.success("Logged out successfully");
+  };
+
+  const goToDashboard = () => {
+    if (userRole === "partner") {
+      navigate("/partner/dashboard");
+    } else {
+      navigate("/dashboard");
+    }
+  };
 
   const { data: plans } = useQuery({
     queryKey: ["active-plans"],
@@ -162,7 +206,87 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Section */}
-      <header className="gradient-primary py-20 px-4">
+      <header className="gradient-primary py-20 px-4 relative">
+        {/* Login/Dashboard Button */}
+        <div className="absolute top-4 right-4 flex items-center gap-2">
+          {loading ? (
+            <Loader2 className="h-5 w-5 animate-spin text-primary-foreground" />
+          ) : user ? (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-primary-foreground hover:bg-primary-foreground/20"
+                onClick={goToDashboard}
+              >
+                <LayoutDashboard className="h-4 w-4 mr-2" />
+                Dashboard
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-primary-foreground hover:bg-primary-foreground/20"
+                onClick={handleSignOut}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
+              </Button>
+            </>
+          ) : (
+            <Dialog open={loginOpen} onOpenChange={setLoginOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-primary-foreground hover:bg-primary-foreground/20"
+                >
+                  <LogIn className="h-4 w-4 mr-2" />
+                  Admin / Partner Login
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Wifi className="h-5 w-5 text-primary" />
+                    Vion Portal Login
+                  </DialogTitle>
+                  <DialogDescription>
+                    Sign in to access the Admin or Partner dashboard
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleLogin} className="space-y-4 mt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="login-email">Email</Label>
+                    <Input
+                      id="login-email"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      autoComplete="email"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="login-password">Password</Label>
+                    <Input
+                      id="login-password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      autoComplete="current-password"
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={isLoggingIn}>
+                    {isLoggingIn ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    Sign In
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
+
         <div className="max-w-4xl mx-auto text-center">
           <div className="flex items-center justify-center gap-3 mb-6">
             <div className="p-3 bg-primary-foreground/20 rounded-xl backdrop-blur">
