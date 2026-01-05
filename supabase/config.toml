@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.handle-ticket-update]
 verify_jwt = false
+
+[functions.seed-partner-accounts]
+verify_jwt = false
