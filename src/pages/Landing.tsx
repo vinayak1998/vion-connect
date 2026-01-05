@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -44,12 +44,24 @@ export default function Landing() {
   const [waitlistErrors, setWaitlistErrors] = useState<Record<string, string>>({});
 
   // Login form state
-  const [loginOpen, setLoginOpen] = useState(false);
+  const [adminLoginOpen, setAdminLoginOpen] = useState(false);
+  const [partnerLoginOpen, setPartnerLoginOpen] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  // Auto-redirect after login
+  useEffect(() => {
+    if (user && userRole) {
+      if (userRole === "partner") {
+        navigate("/partner/dashboard");
+      } else if (userRole === "admin") {
+        navigate("/dashboard");
+      }
+    }
+  }, [user, userRole, navigate]);
+
+  const handleLogin = async (e: React.FormEvent, role: "admin" | "partner") => {
     e.preventDefault();
     if (!loginEmail || !loginPassword) {
       toast.error("Please enter email and password");
@@ -61,7 +73,11 @@ export default function Landing() {
     if (error) {
       toast.error(error.message || "Login failed");
     } else {
-      setLoginOpen(false);
+      if (role === "admin") {
+        setAdminLoginOpen(false);
+      } else {
+        setPartnerLoginOpen(false);
+      }
       setLoginEmail("");
       setLoginPassword("");
       toast.success("Logged in successfully");
@@ -233,57 +249,111 @@ export default function Landing() {
               </Button>
             </>
           ) : (
-            <Dialog open={loginOpen} onOpenChange={setLoginOpen}>
-              <DialogTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-primary-foreground hover:bg-primary-foreground/20"
-                >
-                  <LogIn className="h-4 w-4 mr-2" />
-                  Admin / Partner Login
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    <Wifi className="h-5 w-5 text-primary" />
-                    Vion Portal Login
-                  </DialogTitle>
-                  <DialogDescription>
-                    Sign in to access the Admin or Partner dashboard
-                  </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleLogin} className="space-y-4 mt-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="login-email">Email</Label>
-                    <Input
-                      id="login-email"
-                      type="email"
-                      placeholder="you@example.com"
-                      value={loginEmail}
-                      onChange={(e) => setLoginEmail(e.target.value)}
-                      autoComplete="email"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="login-password">Password</Label>
-                    <Input
-                      id="login-password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
-                      autoComplete="current-password"
-                    />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={isLoggingIn}>
-                    {isLoggingIn ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Sign In
+            <>
+              <Dialog open={adminLoginOpen} onOpenChange={setAdminLoginOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-primary-foreground hover:bg-primary-foreground/20"
+                  >
+                    <LogIn className="h-4 w-4 mr-2" />
+                    Admin Login
                   </Button>
-                </form>
-              </DialogContent>
-            </Dialog>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <Wifi className="h-5 w-5 text-primary" />
+                      Admin Portal
+                    </DialogTitle>
+                    <DialogDescription>
+                      Sign in to access the Admin dashboard
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={(e) => handleLogin(e, "admin")} className="space-y-4 mt-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="admin-login-email">Email</Label>
+                      <Input
+                        id="admin-login-email"
+                        type="email"
+                        placeholder="admin@vion.in"
+                        value={loginEmail}
+                        onChange={(e) => setLoginEmail(e.target.value)}
+                        autoComplete="email"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="admin-login-password">Password</Label>
+                      <Input
+                        id="admin-login-password"
+                        type="password"
+                        placeholder="••••••••"
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        autoComplete="current-password"
+                      />
+                    </div>
+                    <Button type="submit" className="w-full" disabled={isLoggingIn}>
+                      {isLoggingIn ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                      Sign In as Admin
+                    </Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={partnerLoginOpen} onOpenChange={setPartnerLoginOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="bg-primary-foreground/10 border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/20"
+                  >
+                    <LogIn className="h-4 w-4 mr-2" />
+                    Partner Login
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <Wifi className="h-5 w-5 text-primary" />
+                      Partner Portal
+                    </DialogTitle>
+                    <DialogDescription>
+                      Sign in to access the Partner dashboard
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={(e) => handleLogin(e, "partner")} className="space-y-4 mt-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="partner-login-email">Email</Label>
+                      <Input
+                        id="partner-login-email"
+                        type="email"
+                        placeholder="partner@vion.in"
+                        value={loginEmail}
+                        onChange={(e) => setLoginEmail(e.target.value)}
+                        autoComplete="email"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="partner-login-password">Password</Label>
+                      <Input
+                        id="partner-login-password"
+                        type="password"
+                        placeholder="••••••••"
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        autoComplete="current-password"
+                      />
+                    </div>
+                    <Button type="submit" className="w-full" disabled={isLoggingIn}>
+                      {isLoggingIn ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                      Sign In as Partner
+                    </Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </>
           )}
         </div>
 
